@@ -7,4 +7,7 @@ glslc basic2d.frag -o basic2d.frag.spv
 glslc unlit.vert -o unlit.vert.spv
 glslc unlit.frag -o unlit.frag.spv
 
+glslc debug.vert -o debug.vert.spv
+glslc debug.frag -o debug.frag.spv
+
 pause
