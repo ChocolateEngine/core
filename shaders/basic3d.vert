@@ -1,11 +1,11 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(set = 0, binding = 0) uniform UniformBufferObject {
+layout(push_constant) uniform Push
+{
+    mat4 projView;
     mat4 model;
-    mat4 view;
-    mat4 proj;
-} ubo;
+} push;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
@@ -19,14 +19,15 @@ layout(location = 2) out float lightIntensity;
 // const vec3 DIRECTION_TO_LIGHT = normalize(vec3(1.0, 1.0, 1.0));
 const vec3 DIRECTION_TO_LIGHT = normalize(vec3(1.0, 0.5, 1.5));
 
-void main() {
-	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
-	
-	vec3 normalWorldSpace = normalize(mat3(ubo.model) * inNormal);
+void main()
+{
+	gl_Position = push.projView * push.model * vec4(inPosition, 1.0);
+
+	vec3 normalWorldSpace = normalize(mat3(push.model) * inNormal);
 
 	lightIntensity = max(dot(normalWorldSpace, DIRECTION_TO_LIGHT), 0.15);
 
-    	fragColor = lightIntensity * inColor;
-    	fragTexCoord = inTexCoord;
+	fragColor = lightIntensity * inColor;
+	fragTexCoord = inTexCoord;
 }
 
