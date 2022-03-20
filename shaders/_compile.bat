@@ -13,4 +13,7 @@ glslc unlitarray.vert -o unlitarray.vert.spv
 glslc debug.vert -o debug.vert.spv
 glslc debug.frag -o debug.frag.spv
 
+glslc skybox.vert -o skybox.vert.spv
+glslc skybox.frag -o skybox.frag.spv
+
 pause
