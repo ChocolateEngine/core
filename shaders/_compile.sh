@@ -11,6 +11,7 @@ glslc unlitarray.frag -o unlitarray.frag.spv
 glslc unlitarray.vert -o unlitarray.vert.spv
 
 glslc debug.vert -o debug.vert.spv
+glslc debug_col.vert -o debug_col.vert.spv
 glslc debug.frag -o debug.frag.spv
 
 glslc skybox.vert -o skybox.vert.spv
