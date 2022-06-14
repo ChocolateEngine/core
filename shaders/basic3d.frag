@@ -4,12 +4,17 @@
 
 layout(set = 0, binding = 0) uniform UniformBufferObject
 {
+	// texture settings
     int diffuse;
     int ao;
     int emissive;
 
     float aoPower;
     float emissivePower;
+	
+	// morphs
+	// int morphCount;
+	float morphWeight;
 } ubo;
 
 layout(set = 1, binding = 0) uniform sampler2D[] texSamplers;
