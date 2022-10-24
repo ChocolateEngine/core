@@ -39,10 +39,12 @@ void main()
     outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
 	
 	// add ambient occlusion (only one channel is needed here, so just use red)
-	outColor.rgb *= mix( 1, texture(texAO, fragTexCoord).r, mat.aoPower );
+    if ( mat.aoPower > 0.0 )
+	    outColor.rgb *= mix( 1, texture(texAO, fragTexCoord).r, mat.aoPower );
 
 	// add emission
-	outColor.rgb += mix( vec3(0, 0, 0), texture(texEmissive, fragTexCoord).rgb, mat.emissivePower );
+    if ( mat.emissivePower > 0.0 )
+	    outColor.rgb += mix( vec3(0, 0, 0), texture(texEmissive, fragTexCoord).rgb, mat.emissivePower );
 }
 
 // look at this later for cubemaps:
