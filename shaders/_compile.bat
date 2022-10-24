@@ -17,4 +17,7 @@ glslc debug.frag -o debug.frag.spv
 glslc skybox.vert -o skybox.vert.spv
 glslc skybox.frag -o skybox.frag.spv
 
+glslc imgui.vert -o imgui.vert.spv
+glslc imgui.frag -o imgui.frag.spv
+
 pause
