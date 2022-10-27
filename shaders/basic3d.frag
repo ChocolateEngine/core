@@ -6,10 +6,21 @@ layout(push_constant) uniform Push
 {
 	mat4 model;
     int material;
-	int projView;
+	int aViewInfo;
+
+	bool dbgShowDiffuse;
 } push;
 
 layout(set = 0, binding = 0) uniform sampler2D[] texSamplers;
+
+// view info
+layout(set = 1, binding = 0) uniform UBO_ViewInfo
+{
+	mat4 aProjView;
+	mat4 aProjection;
+	mat4 aView;
+	vec3 aViewPos;
+} gViewInfo[];
 
 // Material Info
 layout(set = 2, binding = 0) uniform UBO_Material
@@ -22,8 +33,51 @@ layout(set = 2, binding = 0) uniform UBO_Material
     float emissivePower;
 } materials[];
 
+// TODO: THIS SHOULD NOT BE VARIABLE
+layout(set = 3, binding = 0) uniform UBO_LightInfo
+{
+	int aCountWorld;
+	int aCountPoint;
+	int aCountCone;
+	int aCountCapsule;
+} gLightInfoTmp[];
+
+#define gLightInfo gLightInfoTmp[0]
+
+layout(set = 4, binding = 0) uniform UBO_LightWorld
+{
+    vec3 aColor;
+    vec3 aDir;
+} gLightsWorld[];
+
+layout(set = 5, binding = 0) uniform UBO_LightPoint
+{
+	vec3  aColor;
+	vec3  aPos;
+	float aRadius;
+} gLightsPoint[];
+
+layout(set = 6, binding = 0) uniform UBO_LightCone
+{
+	vec3  aColor;
+	vec3  aPos;
+	vec3  aDir;
+} gLightsCone[];
+
+layout(set = 7, binding = 0) uniform UBO_LightCapsule
+{
+	vec3  aColor;
+	vec3  aDir;
+	float aLength;
+	float aThickness;
+} gLightsCapsule[];
+
 layout(location = 0) in vec2 fragTexCoord;
-layout(location = 1) in float lightIntensity;
+layout(location = 1) in vec3 inPosition;
+layout(location = 2) in vec3 inNormal;
+layout(location = 3) in vec3 inNormalWorld;
+layout(location = 4) in vec3 inTangent;
+// layout(location = 3) in float lightIntensity;
 
 layout(location = 0) out vec4 outColor;
 
@@ -34,13 +88,82 @@ layout(location = 0) out vec4 outColor;
 #define texAO       texSamplers[mat.ao]
 #define texEmissive texSamplers[mat.emissive]
 
+
 void main()
 {
-    outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
-	
+    // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
+    vec4 diffuse = texture( texDiffuse, fragTexCoord );
+
+	// Calculate normal in tangent space
+	vec3 N = normalize( inNormal );
+	vec3 T = inTangent;
+	vec3 B = cross(N, T);
+	mat3 TBN = mat3(T, B, N);
+	// vec3 tnorm = TBN * normalize(texture(samplerNormalMap, inUV).xyz * 2.0 - vec3(1.0));
+	vec3 tnorm = TBN * vec3(1.0, 1.0, 1.0);
+	// outNormal = vec4( tnorm, 1.0 );
+	// outNormal = vec4( inTangent, 1.0 );
+	// outNormal = vec4( inNormal, 1.0 );
+
+	// Convert normal and position to eye coords
+	// vec3 eyeNorm = normalize( normal_matrix * inNormal );
+	vec4 eyePos = push.model * vec4( inPosition, 1.0 );
+
+	outColor = vec4(0, 0, 0, diffuse.a);
+
+	if ( gLightInfo.aCountWorld == 0 )
+		outColor = diffuse;
+
+	for ( int i = 0; i < gLightInfo.aCountWorld; i++ )
+	{
+		// Diffuse part
+		float intensity = max( dot( inNormalWorld, gLightsWorld[ i ].aDir ), 0.f );
+
+		if ( push.dbgShowDiffuse )
+			outColor.rgb += vec3( max( intensity, 0.15 ) );
+		else
+			outColor.rgb += max( intensity, 0.15 ) * diffuse.rgb;
+	}
+
+	for ( int i = 0; i < gLightInfo.aCountPoint; i++ )
+	{
+		// Vector to light
+		vec3 L = gLightsPoint[ i ].aPos - inPosition;
+		// Distance from light to fragment position
+		float dist = length( L );
+
+		// Viewer to fragment
+		// vec3 distVec = gViewInfo[ push.aViewInfo ].aViewPos.xyz - gLightsPoint[ i ].aPos;
+		// vec3 distVec = gLightsPoint[ i ].aPos;
+		// float dist2 = length( distVec );
+		
+		//if(dist < ubo.lights[i].radius)
+		{
+			// Light to fragment
+			L = normalize(L);
+
+			// Attenuation
+			float atten = gLightsPoint[ i ].aRadius / (pow(dist, 2.0) + 1.0);
+
+			// Diffuse part
+			vec3 N = normalize( inNormalWorld );
+			float NdotL = max( 0.0, dot(N, gLightsPoint[ i ].aPos) );
+			vec3 diff = gLightsPoint[ i ].aColor * diffuse.rgb * NdotL * atten;
+
+			// Specular part
+			// Specular map values are stored in alpha of diffuse basic3d
+			// vec3 R = reflect(-L, N);
+			// float NdotR = max(0.0, dot(R, V));
+			// vec3 spec = ubo.lights[i].color * diffuse.a * pow(NdotR, 16.0) * atten;
+
+			// fragcolor += diff + spec;
+			outColor.rgb += diff;
+		}
+	}
+
 	// add ambient occlusion (only one channel is needed here, so just use red)
     if ( mat.aoPower > 0.0 )
-	    outColor.rgb *= mix( 1, texture(texAO, fragTexCoord).r, mat.aoPower );
+		outColor *= mix( 1, texture(texAO, fragTexCoord).r, mat.aoPower );
 
 	// add emission
     if ( mat.emissivePower > 0.0 )

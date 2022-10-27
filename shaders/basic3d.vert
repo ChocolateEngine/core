@@ -6,14 +6,19 @@ layout(push_constant) uniform Push
 {
 	mat4 model;
     int material;
-	int projView;
+	int aViewInfo;
+
+	bool dbgShowDiffuse;
 } push;
 
-// projView info
-layout(set = 1, binding = 0) uniform UBO_ProjView
+// view info
+layout(set = 1, binding = 0) uniform UBO_ViewInfo
 {
-	mat4 projView;
-} projView[];
+	mat4 aProjView;
+	mat4 aProjection;
+	mat4 aView;
+	vec3 aViewPos;
+} gViewInfo[];
 
 // Material Info
 layout(set = 2, binding = 0) uniform UBO_Material
@@ -42,10 +47,11 @@ layout(location = 2) in vec2 inTexCoord;
 */
 
 layout(location = 0) out vec2 fragTexCoord;
-layout(location = 1) out float lightIntensity;
-
-// const vec3 DIRECTION_TO_LIGHT = normalize(vec3(1.0, 1.0, 1.0));
-const vec3 DIRECTION_TO_LIGHT = normalize(vec3(1.0, 0.5, 1.5));
+layout(location = 1) out vec3 outPosition;
+layout(location = 2) out vec3 outNormal;
+layout(location = 3) out vec3 outNormalWorld;
+layout(location = 4) out vec3 outTangent;
+// layout(location = 3) out float lightIntensity;
 
 void main()
 {
@@ -67,13 +73,31 @@ void main()
 
 	// newPos += (ubo.morphWeight * inMorphPos);
 
-	gl_Position = projView[push.projView].projView * push.model * vec4(newPos, 1.0);
+	gl_Position = gViewInfo[push.aViewInfo].aProjView * push.model * vec4(newPos, 1.0);
 	// gl_Position = projView[push.projView].projView * vec4(newPos, 1.0);
 
-	vec3 normalWorldSpace = normalize(mat3(push.model) * inNormal);
+	outPosition = (push.model * vec4(newPos, 1.0)).rgb;
 
-	lightIntensity = max(dot(normalWorldSpace, DIRECTION_TO_LIGHT), 0.15);
+	vec3 normalWorldSpace = normalize(mat3(push.model) * inNormal);
+	outNormal = inNormal;
+	outNormalWorld = normalWorldSpace;
+
+	// lightIntensity = max(dot(normalWorldSpace, DIRECTION_TO_LIGHT), 0.15);
 
 	fragTexCoord = inTexCoord;
+
+    vec3 c1 = cross( inNormal, vec3(0.0, 0.0, 1.0) );
+    vec3 c2 = cross( inNormal, vec3(0.0, 1.0, 0.0) );
+
+    if (length(c1) > length(c2))
+    {
+        outTangent = c1;
+    }
+    else
+    {
+        outTangent = c2;
+    }
+
+    outTangent = normalize(outTangent);
 }
 
