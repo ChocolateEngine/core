@@ -8,7 +8,7 @@ layout(push_constant) uniform Push
     int material;
 	int aViewInfo;
 
-	bool dbgShowDiffuse;
+	int aDebugDraw;
 } push;
 
 layout(set = 0, binding = 0) uniform sampler2D[] texSamplers;
@@ -54,7 +54,7 @@ layout(set = 5, binding = 0) uniform UBO_LightPoint
 {
 	vec3  aColor;
 	vec3  aPos;
-	float aRadius;
+	float aRadius;  // TODO: look into using constant, linear, and quadratic lighting, more customizable than this
 } gLightsPoint[];
 
 layout(set = 6, binding = 0) uniform UBO_LightCone
@@ -62,6 +62,7 @@ layout(set = 6, binding = 0) uniform UBO_LightCone
 	vec3  aColor;
 	vec3  aPos;
 	vec3  aDir;
+	vec2  aFov;  // x is inner FOV, y is outer FOV
 } gLightsCone[];
 
 layout(set = 7, binding = 0) uniform UBO_LightCapsule
@@ -95,10 +96,10 @@ void main()
     vec4 diffuse = texture( texDiffuse, fragTexCoord );
 
 	// Calculate normal in tangent space
-	vec3 N = normalize( inNormal );
+	vec3 vertNormal = normalize( inNormal );
 	vec3 T = inTangent;
-	vec3 B = cross(N, T);
-	mat3 TBN = mat3(T, B, N);
+	vec3 B = cross(vertNormal, T);
+	mat3 TBN = mat3(T, B, vertNormal);
 	// vec3 tnorm = TBN * normalize(texture(samplerNormalMap, inUV).xyz * 2.0 - vec3(1.0));
 	vec3 tnorm = TBN * vec3(1.0, 1.0, 1.0);
 	// outNormal = vec4( tnorm, 1.0 );
@@ -108,6 +109,23 @@ void main()
 	// Convert normal and position to eye coords
 	// vec3 eyeNorm = normalize( normal_matrix * inNormal );
 	vec4 eyePos = push.model * vec4( inPosition, 1.0 );
+
+	if ( push.aDebugDraw == 1 )
+		diffuse = vec4(1, 1, 1, 1);
+
+	if ( push.aDebugDraw > 1 && push.aDebugDraw < 5 )
+	{
+		if ( push.aDebugDraw == 2 )
+			outColor = vec4(inNormalWorld, 1);
+
+		if ( push.aDebugDraw == 3 )
+			outColor = vec4(inNormal, 1);
+
+		if ( push.aDebugDraw == 4 )
+			outColor = vec4(inTangent, 1);
+
+		return;
+	}
 
 	outColor = vec4(0, 0, 0, diffuse.a);
 
@@ -119,46 +137,64 @@ void main()
 		// Diffuse part
 		float intensity = max( dot( inNormalWorld, gLightsWorld[ i ].aDir ), 0.f );
 
-		if ( push.dbgShowDiffuse )
-			outColor.rgb += vec3( max( intensity, 0.15 ) );
-		else
-			outColor.rgb += max( intensity, 0.15 ) * diffuse.rgb;
+		// if ( push.dbgShowDiffuse )
+		//	outColor.rgb += gLightsWorld[ i ].aColor * vec3( max( intensity, 0.15 ) );
+		// else
+			outColor.rgb += gLightsWorld[ i ].aColor * max( intensity, 0.15 ) * diffuse.rgb;
 	}
 
 	for ( int i = 0; i < gLightInfo.aCountPoint; i++ )
 	{
 		// Vector to light
-		vec3 L = gLightsPoint[ i ].aPos - inPosition;
-		// Distance from light to fragment position
-		float dist = length( L );
+		vec3 lightDir = gLightsPoint[ i ].aPos - inPosition;
 
-		// Viewer to fragment
-		// vec3 distVec = gViewInfo[ push.aViewInfo ].aViewPos.xyz - gLightsPoint[ i ].aPos;
-		// vec3 distVec = gLightsPoint[ i ].aPos;
-		// float dist2 = length( distVec );
-		
+		// Distance from light to fragment position
+		float dist = length( lightDir );
+
 		//if(dist < ubo.lights[i].radius)
 		{
-			// Light to fragment
-			L = normalize(L);
+			lightDir = normalize(lightDir);
 
 			// Attenuation
 			float atten = gLightsPoint[ i ].aRadius / (pow(dist, 2.0) + 1.0);
 
 			// Diffuse part
-			vec3 N = normalize( inNormalWorld );
-			float NdotL = max( 0.0, dot(N, gLightsPoint[ i ].aPos) );
+			vec3 vertNormal = normalize( inNormalWorld );
+			float NdotL = max( 0.0, dot(vertNormal, lightDir) );
 			vec3 diff = gLightsPoint[ i ].aColor * diffuse.rgb * NdotL * atten;
 
-			// Specular part
-			// Specular map values are stored in alpha of diffuse basic3d
-			// vec3 R = reflect(-L, N);
-			// float NdotR = max(0.0, dot(R, V));
-			// vec3 spec = ubo.lights[i].color * diffuse.a * pow(NdotR, 16.0) * atten;
-
-			// fragcolor += diff + spec;
 			outColor.rgb += diff;
 		}
+	}
+
+	#define CONSTANT 1
+	#define LINEAR 1
+	#define QUADRATIC 1
+
+	for ( int i = 0; i < gLightInfo.aCountCone; i++ )
+	{
+		// Vector to light
+		vec3 lightDir = gLightsCone[ i ].aPos - inPosition;
+		lightDir = normalize(lightDir);
+
+		// Distance from light to fragment position
+		float dist = length( lightDir );
+
+		float theta = dot( lightDir, normalize( -gLightsCone[ i ].aDir.xyz ));
+
+		// Inner Cone FOV - Outer Cone FOV
+		float epsilon   = gLightsCone[ i ].aFov.x - gLightsCone[ i ].aFov.y;
+		// float intensity = clamp( (theta - gLightsCone[ i ].aFov.y) / epsilon, 0.0, 1.0 );
+		float intensity = clamp( (gLightsCone[ i ].aFov.y - theta) / epsilon, 0.0, 1.0 );
+
+		// attenuation
+		float atten = 1.0 / (pow(dist, 1.0) + 1.0);
+		// float atten = 1.0 / (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
+		// float atten = (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
+
+		vec3 diff = gLightsCone[ i ].aColor * diffuse.rgb * intensity * atten;
+
+		outColor.rgb += diff;
 	}
 
 	// add ambient occlusion (only one channel is needed here, so just use red)
