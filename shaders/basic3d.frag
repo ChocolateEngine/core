@@ -22,19 +22,8 @@ layout(set = 1, binding = 0) uniform UBO_ViewInfo
 	vec3 aViewPos;
 } gViewInfo[];
 
-// Material Info
-layout(set = 2, binding = 0) uniform UBO_Material
-{
-    int diffuse;
-    int ao;
-    int emissive;
-
-    float aoPower;
-    float emissivePower;
-} materials[];
-
 // TODO: THIS SHOULD NOT BE VARIABLE
-layout(set = 3, binding = 0) uniform UBO_LightInfo
+layout(set = 2, binding = 0) uniform UBO_LightInfo
 {
 	int aCountWorld;
 	int aCountPoint;
@@ -44,34 +33,46 @@ layout(set = 3, binding = 0) uniform UBO_LightInfo
 
 #define gLightInfo gLightInfoTmp[0]
 
-layout(set = 4, binding = 0) uniform UBO_LightWorld
+layout(set = 3, binding = 0) uniform UBO_LightWorld
 {
-    vec3 aColor;
+    vec4 aColor;
     vec3 aDir;
 } gLightsWorld[];
 
-layout(set = 5, binding = 0) uniform UBO_LightPoint
+layout(set = 4, binding = 0) uniform UBO_LightPoint
 {
-	vec3  aColor;
+	vec4  aColor;
 	vec3  aPos;
 	float aRadius;  // TODO: look into using constant, linear, and quadratic lighting, more customizable than this
 } gLightsPoint[];
 
-layout(set = 6, binding = 0) uniform UBO_LightCone
+layout(set = 5, binding = 0) uniform UBO_LightCone
 {
-	vec3  aColor;
-	vec3  aPos;
-	vec3  aDir;
-	vec2  aFov;  // x is inner FOV, y is outer FOV
+	vec4 aColor;
+	vec3 aPos;
+	vec3 aDir;
+	vec2 aFov;  // x is inner FOV, y is outer FOV
+	int  aShadow;  // shadow texture index
 } gLightsCone[];
 
-layout(set = 7, binding = 0) uniform UBO_LightCapsule
+layout(set = 6, binding = 0) uniform UBO_LightCapsule
 {
-	vec3  aColor;
+	vec4  aColor;
 	vec3  aDir;
 	float aLength;
 	float aThickness;
 } gLightsCapsule[];
+
+// Material Info
+layout(set = 7, binding = 0) uniform UBO_Material
+{
+    int diffuse;
+    int ao;
+    int emissive;
+
+    float aoPower;
+    float emissivePower;
+} materials[];
 
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec3 inPosition;
@@ -140,7 +141,7 @@ void main()
 		// if ( push.dbgShowDiffuse )
 		//	outColor.rgb += gLightsWorld[ i ].aColor * vec3( max( intensity, 0.15 ) );
 		// else
-			outColor.rgb += gLightsWorld[ i ].aColor * max( intensity, 0.15 ) * diffuse.rgb;
+			outColor.rgb += gLightsWorld[ i ].aColor.rgb * max( intensity, 0.15 ) * diffuse.rgb;
 	}
 
 	for ( int i = 0; i < gLightInfo.aCountPoint; i++ )
@@ -161,7 +162,7 @@ void main()
 			// Diffuse part
 			vec3 vertNormal = normalize( inNormalWorld );
 			float NdotL = max( 0.0, dot(vertNormal, lightDir) );
-			vec3 diff = gLightsPoint[ i ].aColor * diffuse.rgb * NdotL * atten;
+			vec3 diff = gLightsPoint[ i ].aColor.rgb * diffuse.rgb * NdotL * atten;
 
 			outColor.rgb += diff;
 		}
@@ -192,7 +193,7 @@ void main()
 		// float atten = 1.0 / (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
 		// float atten = (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
 
-		vec3 diff = gLightsCone[ i ].aColor * diffuse.rgb * intensity * atten;
+		vec3 diff = gLightsCone[ i ].aColor.rgb * diffuse.rgb * intensity * atten;
 
 		outColor.rgb += diff;
 	}

@@ -21,7 +21,7 @@ layout(set = 1, binding = 0) uniform UBO_ViewInfo
 } gViewInfo[];
 
 // Material Info
-layout(set = 2, binding = 0) uniform UBO_Material
+layout(set = 7, binding = 0) uniform UBO_Material
 {
     int diffuse;
     int ao;
