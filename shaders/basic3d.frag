@@ -181,7 +181,7 @@ void main()
 		// Distance from light to fragment position
 		float dist = length( lightDir );
 
-		float theta = dot( lightDir, normalize( -gLightsCone[ i ].aDir.xyz ));
+		float theta = dot( lightDir, normalize( gLightsCone[ i ].aDir.xyz ));
 
 		// Inner Cone FOV - Outer Cone FOV
 		float epsilon   = gLightsCone[ i ].aFov.x - gLightsCone[ i ].aFov.y;
