@@ -18,7 +18,18 @@ layout(set = 1, binding = 0) uniform UBO_ViewInfo
 	mat4 aProjection;
 	mat4 aView;
 	vec3 aViewPos;
+	float aNearZ;
+	float aFarZ;
 } gViewInfo[];
+
+// TODO: THIS SHOULD NOT BE VARIABLE
+layout(set = 2, binding = 0) uniform UBO_LightInfo
+{
+	int aCountWorld;
+	int aCountPoint;
+	int aCountCone;
+	int aCountCapsule;
+} gLightInfoTmp[];
 
 // Material Info
 layout(set = 7, binding = 0) uniform UBO_Material
@@ -30,6 +41,16 @@ layout(set = 7, binding = 0) uniform UBO_Material
     float aoPower;
     float emissivePower;
 } materials[];
+
+layout(set = 5, binding = 0) uniform UBO_LightCone
+{
+	vec4 aColor;
+	vec3 aPos;
+	vec3 aDir;
+	vec2 aFov;  // x is inner FOV, y is outer FOV
+	int  aViewInfo;  // view info for light/shadow
+	int  aShadow;  // shadow texture index
+} gLightsCone[];
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
@@ -48,9 +69,10 @@ layout(location = 2) in vec2 inTexCoord;
 
 layout(location = 0) out vec2 fragTexCoord;
 layout(location = 1) out vec3 outPosition;
-layout(location = 2) out vec3 outNormal;
-layout(location = 3) out vec3 outNormalWorld;
-layout(location = 4) out vec3 outTangent;
+layout(location = 2) out vec3 outPositionWorld;
+layout(location = 3) out vec3 outNormal;
+layout(location = 4) out vec3 outNormalWorld;
+layout(location = 5) out vec3 outTangent;
 // layout(location = 3) out float lightIntensity;
 
 void main()
@@ -69,14 +91,13 @@ void main()
 	// or, for each blend shape
 	// for ( int i = 0; i < ubo.morphCount; i++ )
 
-	vec3 newPos = vec3(inPosition.xyz);
+	outPosition = inPosition;
+	outPositionWorld = (push.model * vec4(inPosition, 1.0)).rgb;
 
 	// newPos += (ubo.morphWeight * inMorphPos);
 
-	gl_Position = gViewInfo[push.aViewInfo].aProjView * push.model * vec4(newPos, 1.0);
-	// gl_Position = projView[push.projView].projView * vec4(newPos, 1.0);
-
-	outPosition = (push.model * vec4(newPos, 1.0)).rgb;
+	gl_Position = gViewInfo[push.aViewInfo].aProjView * push.model * vec4(inPosition, 1.0);
+	// gl_Position = projView[push.projView].projView * vec4(inPosition, 1.0);
 
 	vec3 normalWorldSpace = normalize(mat3(push.model) * inNormal);
 	outNormal = inNormal;

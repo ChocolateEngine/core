@@ -15,6 +15,8 @@ layout(set = 0, binding = 0) uniform UBO_ViewInfo
 	mat4 aProjection;
 	mat4 aView;
 	vec3 aViewPos;
+	float aNearZ;
+	float aFarZ;
 } gViewInfo[];
 
 layout(location = 0) in vec3 inPosition;

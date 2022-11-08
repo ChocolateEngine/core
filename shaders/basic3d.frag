@@ -20,6 +20,8 @@ layout(set = 1, binding = 0) uniform UBO_ViewInfo
 	mat4 aProjection;
 	mat4 aView;
 	vec3 aViewPos;
+	float aNearZ;
+	float aFarZ;
 } gViewInfo[];
 
 // TODO: THIS SHOULD NOT BE VARIABLE
@@ -52,6 +54,7 @@ layout(set = 5, binding = 0) uniform UBO_LightCone
 	vec3 aPos;
 	vec3 aDir;
 	vec2 aFov;  // x is inner FOV, y is outer FOV
+	int  aViewInfo;  // view info for light/shadow
 	int  aShadow;  // shadow texture index
 } gLightsCone[];
 
@@ -76,10 +79,10 @@ layout(set = 7, binding = 0) uniform UBO_Material
 
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 1) in vec3 inPosition;
-layout(location = 2) in vec3 inNormal;
-layout(location = 3) in vec3 inNormalWorld;
-layout(location = 4) in vec3 inTangent;
-// layout(location = 3) in float lightIntensity;
+layout(location = 2) in vec3 inPositionWorld;
+layout(location = 3) in vec3 inNormal;
+layout(location = 4) in vec3 inNormalWorld;
+layout(location = 5) in vec3 inTangent;
 
 layout(location = 0) out vec4 outColor;
 
@@ -89,6 +92,45 @@ layout(location = 0) out vec4 outColor;
 #define texDiffuse  texSamplers[mat.diffuse]
 #define texAO       texSamplers[mat.ao]
 #define texEmissive texSamplers[mat.emissive]
+
+
+const mat4 gBiasMat = mat4(
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 );
+
+// const mat4 gBiasMat = mat4(
+// 	0.5, 0.0, 0.0, 0.0,
+// 	0.0, 0.5, 0.0, 0.0,
+// 	0.0, 0.0, 0.5, 0.0, 
+// 	0.5, 0.5, 0.5, 1.0 );
+
+const float gAmbient = 0.0f;
+
+
+float textureProj( int shadowIndex, vec4 shadowCoord )
+{
+	float shadow = 1.0;
+	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
+	{
+		float depth = texture( texSamplers[ shadowIndex ], shadowCoord.st ).r;
+		if ( shadowCoord.w > 0.0 && depth < shadowCoord.z )
+		{
+			shadow = gAmbient;
+		}
+	}
+
+	return shadow;
+}
+
+float LinearizeDepth( float sNearZ, float sFarZ, float sDepth )
+{
+	float n = sNearZ;
+	float f = sFarZ;
+	float z = sDepth;
+	return (2.0 * n) / (f + n - z * (f - n));
+}
 
 
 void main()
@@ -106,10 +148,6 @@ void main()
 	// outNormal = vec4( tnorm, 1.0 );
 	// outNormal = vec4( inTangent, 1.0 );
 	// outNormal = vec4( inNormal, 1.0 );
-
-	// Convert normal and position to eye coords
-	// vec3 eyeNorm = normalize( normal_matrix * inNormal );
-	vec4 eyePos = push.model * vec4( inPosition, 1.0 );
 
 	if ( push.aDebugDraw == 1 )
 		diffuse = vec4(1, 1, 1, 1);
@@ -147,7 +185,7 @@ void main()
 	for ( int i = 0; i < gLightInfo.aCountPoint; i++ )
 	{
 		// Vector to light
-		vec3 lightDir = gLightsPoint[ i ].aPos - inPosition;
+		vec3 lightDir = gLightsPoint[ i ].aPos - inPositionWorld;
 
 		// Distance from light to fragment position
 		float dist = length( lightDir );
@@ -174,8 +212,11 @@ void main()
 
 	for ( int i = 0; i < gLightInfo.aCountCone; i++ )
 	{
+		if ( gLightsCone[ i ].aColor.w == 0.f )
+			continue;
+
 		// Vector to light
-		vec3 lightDir = gLightsCone[ i ].aPos - inPosition;
+		vec3 lightDir = gLightsCone[ i ].aPos - inPositionWorld;
 		lightDir = normalize(lightDir);
 
 		// Distance from light to fragment position
@@ -194,6 +235,17 @@ void main()
 		// float atten = (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
 
 		vec3 diff = gLightsCone[ i ].aColor.rgb * diffuse.rgb * intensity * atten;
+
+		// shadow
+		if ( gLightsCone[ i ].aShadow != -1 )
+		{
+			mat4 depthBiasMVP = gBiasMat * gViewInfo[ gLightsCone[ i ].aViewInfo ].aProjView;
+			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
+
+			float shadow = textureProj( gLightsCone[ i ].aShadow, vec4(shadowCoord / shadowCoord.w) );
+			// float shadow = textureProj( 0, vec4(shadowCoord / shadowCoord.w) );
+			diff *= shadow;
+		}
 
 		outColor.rgb += diff;
 	}

@@ -20,10 +20,7 @@ glslc skybox.frag -o skybox.frag.spv
 glslc imgui.vert -o imgui.vert.spv
 glslc imgui.frag -o imgui.frag.spv
 
-@REM glslc deferred.vert -o deferred.vert.spv
-@REM glslc deferred.frag -o deferred.frag.spv
-
-glslc deferred_fullscreen.vert -o deferred_fullscreen.vert.spv
-glslc deferred_fullscreen.frag -o deferred_fullscreen.frag.spv
+glslc shadow.vert -o shadow.vert.spv
+glslc shadow.frag -o shadow.frag.spv
 
 pause
