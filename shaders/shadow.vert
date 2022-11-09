@@ -6,10 +6,11 @@ layout(push_constant) uniform Push
 {
 	mat4 aModel;
 	int  aViewInfo;
+	int  aAlbedo;
 } push;
 
 // view info
-layout(set = 0, binding = 0) uniform UBO_ViewInfo
+layout(set = 1, binding = 0) uniform UBO_ViewInfo
 {
 	mat4 aProjView;
 	mat4 aProjection;
@@ -20,9 +21,13 @@ layout(set = 0, binding = 0) uniform UBO_ViewInfo
 } gViewInfo[];
 
 layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec2 inTexCoord;
+
+layout(location = 0) out vec2 outTexCoord;
 
 void main()
 {
 	gl_Position = gViewInfo[push.aViewInfo].aProjView * push.aModel * vec4(inPosition, 1.0);
+	outTexCoord = inTexCoord;
 }
 

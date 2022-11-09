@@ -39,6 +39,8 @@ layout(set = 3, binding = 0) uniform UBO_LightWorld
 {
     vec4 aColor;
     vec3 aDir;
+	int  aViewInfo;  // view info for light/shadow
+	int  aShadow;  // shadow texture index
 } gLightsWorld[];
 
 layout(set = 4, binding = 0) uniform UBO_LightPoint
@@ -100,19 +102,13 @@ const mat4 gBiasMat = mat4(
 	0.0, 0.0, 1.0, 0.0,
 	0.5, 0.5, 0.0, 1.0 );
 
-// const mat4 gBiasMat = mat4(
-// 	0.5, 0.0, 0.0, 0.0,
-// 	0.0, 0.5, 0.0, 0.0,
-// 	0.0, 0.0, 0.5, 0.0, 
-// 	0.5, 0.5, 0.5, 1.0 );
-
 const float gAmbient = 0.0f;
 
 
 float textureProj( int shadowIndex, vec4 shadowCoord )
 {
 	float shadow = 1.0;
-	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
+	// if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
 	{
 		float depth = texture( texSamplers[ shadowIndex ], shadowCoord.st ).r;
 		if ( shadowCoord.w > 0.0 && depth < shadowCoord.z )
@@ -137,6 +133,9 @@ void main()
 {
     // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
     vec4 diffuse = texture( texDiffuse, fragTexCoord );
+
+	// outColor = diffuse;
+	// return;
 
 	// Calculate normal in tangent space
 	vec3 vertNormal = normalize( inNormal );
@@ -173,17 +172,40 @@ void main()
 
 	for ( int i = 0; i < gLightInfo.aCountWorld; i++ )
 	{
+		if ( gLightsWorld[ i ].aColor.w == 0.f )
+			continue;
+
 		// Diffuse part
 		float intensity = max( dot( inNormalWorld, gLightsWorld[ i ].aDir ), 0.f );
+
+		vec3 diff;
 
 		// if ( push.dbgShowDiffuse )
 		//	outColor.rgb += gLightsWorld[ i ].aColor * vec3( max( intensity, 0.15 ) );
 		// else
-			outColor.rgb += gLightsWorld[ i ].aColor.rgb * max( intensity, 0.15 ) * diffuse.rgb;
+			diff = gLightsWorld[ i ].aColor.rgb * max( intensity, 0.15 ) * diffuse.rgb;
+
+		// shadow
+		if ( gLightsWorld[ i ].aShadow != -1 )
+		{
+			mat4 depthBiasMVP = gBiasMat * gViewInfo[ gLightsWorld[ i ].aViewInfo ].aProjView;
+			// mat4 depthBiasMVP = gBiasMat * gViewInfo[ 0 ].aProjView;
+			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
+
+			// float shadow = textureProj( gLightsWorld[ i ].aShadow, vec4(shadowCoord / shadowCoord.w) );
+			float shadow = textureProj( 0, vec4(shadowCoord / shadowCoord.w) );
+			diff *= shadow;
+			// diff = shadow;
+		}
+
+		outColor.rgb += diff;
 	}
 
 	for ( int i = 0; i < gLightInfo.aCountPoint; i++ )
 	{
+		if ( gLightsPoint[ i ].aColor.w == 0.f )
+			continue;
+
 		// Vector to light
 		vec3 lightDir = gLightsPoint[ i ].aPos - inPositionWorld;
 
@@ -257,6 +279,8 @@ void main()
 	// add emission
     if ( mat.emissivePower > 0.0 )
 	    outColor.rgb += mix( vec3(0, 0, 0), texture(texEmissive, fragTexCoord).rgb, mat.emissivePower );
+
+	gl_FragDepth = gl_FragCoord.z / outColor.a;
 }
 
 // look at this later for cubemaps:
