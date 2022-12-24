@@ -71,12 +71,14 @@ layout(set = 6, binding = 0) uniform UBO_LightCapsule
 // Material Info
 layout(set = 7, binding = 0) uniform UBO_Material
 {
-    int diffuse;
+    int albedo;
     int ao;
     int emissive;
 
     float aoPower;
     float emissivePower;
+
+	bool aAlphaTest;
 } materials[];
 
 layout(location = 0) in vec2 fragTexCoord;
@@ -91,7 +93,7 @@ layout(location = 0) out vec4 outColor;
 #define mat materials[push.material]
 // #define mat materials[0]
 
-#define texDiffuse  texSamplers[mat.diffuse]
+#define texDiffuse  texSamplers[mat.albedo]
 #define texAO       texSamplers[mat.ao]
 #define texEmissive texSamplers[mat.emissive]
 
@@ -132,9 +134,20 @@ float LinearizeDepth( float sNearZ, float sFarZ, float sDepth )
 void main()
 {
     // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
-    vec4 diffuse = texture( texDiffuse, fragTexCoord );
+    vec4 albedo = texture( texDiffuse, fragTexCoord );
 
-	// outColor = diffuse;
+	if ( mat.aAlphaTest && albedo.a == 0.f )
+	{
+		outColor     = albedo;
+		gl_FragDepth = gl_FragCoord.z / outColor.a;
+		return;
+	}
+	else
+	{
+		gl_FragDepth = gl_FragCoord.z;
+	}
+
+	// outColor = albedo;
 	// return;
 
 	// Calculate normal in tangent space
@@ -149,7 +162,7 @@ void main()
 	// outNormal = vec4( inNormal, 1.0 );
 
 	if ( push.aDebugDraw == 1 )
-		diffuse = vec4(1, 1, 1, 1);
+		albedo = vec4(1, 1, 1, 1);
 
 	if ( push.aDebugDraw > 1 && push.aDebugDraw < 5 )
 	{
@@ -165,10 +178,10 @@ void main()
 		return;
 	}
 
-	outColor = vec4(0, 0, 0, diffuse.a);
+	outColor = vec4(0, 0, 0, albedo.a);
 
 	if ( gLightInfo.aCountWorld == 0 )
-		outColor = diffuse;
+		outColor = albedo;
 
 	for ( int i = 0; i < gLightInfo.aCountWorld; i++ )
 	{
@@ -183,7 +196,7 @@ void main()
 		// if ( push.dbgShowDiffuse )
 		//	outColor.rgb += gLightsWorld[ i ].aColor * vec3( max( intensity, 0.15 ) );
 		// else
-			diff = gLightsWorld[ i ].aColor.rgb * max( intensity, 0.15 ) * diffuse.rgb;
+			diff = gLightsWorld[ i ].aColor.rgb * gLightsWorld[ i ].aColor.a * max( intensity, 0.15 ) * albedo.rgb;
 
 		// shadow
 		if ( gLightsWorld[ i ].aShadow != -1 )
@@ -222,7 +235,7 @@ void main()
 			// Diffuse part
 			vec3 vertNormal = normalize( inNormalWorld );
 			float NdotL = max( 0.0, dot(vertNormal, lightDir) );
-			vec3 diff = gLightsPoint[ i ].aColor.rgb * diffuse.rgb * NdotL * atten;
+			vec3 diff = gLightsPoint[ i ].aColor.rgb * gLightsPoint[ i ].aColor.a * albedo.rgb * NdotL * atten;
 
 			outColor.rgb += diff;
 		}
@@ -256,7 +269,7 @@ void main()
 		// float atten = 1.0 / (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
 		// float atten = (CONSTANT + LINEAR * dist + QUADRATIC * (dist * dist));
 
-		vec3 diff = gLightsCone[ i ].aColor.rgb * diffuse.rgb * intensity * atten;
+		vec3 diff = gLightsCone[ i ].aColor.rgb * gLightsCone[ i ].aColor.a * albedo.rgb * intensity * atten;
 
 		// shadow
 		if ( gLightsCone[ i ].aShadow != -1 )
@@ -264,8 +277,9 @@ void main()
 			mat4 depthBiasMVP = gBiasMat * gViewInfo[ gLightsCone[ i ].aViewInfo ].aProjView;
 			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
 
+			// TODO: this could go out of bounds and lose the device
+			// maybe add a check here to make sure we don't go out of bounds?
 			float shadow = textureProj( gLightsCone[ i ].aShadow, vec4(shadowCoord / shadowCoord.w) );
-			// float shadow = textureProj( 0, vec4(shadowCoord / shadowCoord.w) );
 			diff *= shadow;
 		}
 
@@ -279,8 +293,6 @@ void main()
 	// add emission
     if ( mat.emissivePower > 0.0 )
 	    outColor.rgb += mix( vec3(0, 0, 0), texture(texEmissive, fragTexCoord).rgb, mat.emissivePower );
-
-	gl_FragDepth = gl_FragCoord.z / outColor.a;
 }
 
 // look at this later for cubemaps:

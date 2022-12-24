@@ -34,12 +34,14 @@ layout(set = 2, binding = 0) uniform UBO_LightInfo
 // Material Info
 layout(set = 7, binding = 0) uniform UBO_Material
 {
-    int diffuse;
+    int albedo;
     int ao;
     int emissive;
 
     float aoPower;
     float emissivePower;
+
+	bool aAlphaTest;
 } materials[];
 
 layout(set = 5, binding = 0) uniform UBO_LightCone
@@ -100,6 +102,12 @@ void main()
 	// gl_Position = projView[push.projView].projView * vec4(inPosition, 1.0);
 
 	vec3 normalWorldSpace = normalize(mat3(push.model) * inNormal);
+
+	if ( isnan( normalWorldSpace.x ) )
+	{
+		normalWorldSpace = vec3(0, 0, 0);
+	}
+
 	outNormal = inNormal;
 	outNormalWorld = normalWorldSpace;
 
@@ -120,5 +128,10 @@ void main()
     }
 
     outTangent = normalize(outTangent);
+
+	if ( isnan( outTangent.x ) )
+	{
+		outTangent = vec3(0, 0, 0);
+	}
 }
 
