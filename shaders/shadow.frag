@@ -26,10 +26,6 @@ layout(location = 0) in vec2 inTexCoord;
 
 void main()
 {
-	gl_FragDepth = gl_FragCoord.z;
-
-	if ( push.aAlbedo >= 0 )
-	{
-		gl_FragDepth /= textureLod( texSamplers[ push.aAlbedo ], inTexCoord, 0 ).a;
-	}
+	if ( push.aAlbedo >= 0 && texture( texSamplers[ push.aAlbedo ], inTexCoord ).a < 0.5)
+		discard;
 }
