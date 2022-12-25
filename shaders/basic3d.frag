@@ -2,6 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
+#include "common_shadow.glsl"
+
 layout(push_constant) uniform Push
 {
 	mat4 model;
@@ -106,22 +108,6 @@ const mat4 gBiasMat = mat4(
 
 const float gAmbient = 0.0f;
 
-
-float textureProj( int shadowIndex, vec4 shadowCoord )
-{
-	float shadow = 1.0;
-	// if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
-	{
-		float depth = texture( texSamplers[ shadowIndex ], shadowCoord.st ).r;
-		if ( shadowCoord.w > 0.0 && depth < shadowCoord.z )
-		{
-			shadow = gAmbient;
-		}
-	}
-
-	return shadow;
-}
-
 float LinearizeDepth( float sNearZ, float sFarZ, float sDepth )
 {
 	float n = sNearZ;
@@ -136,16 +122,9 @@ void main()
     // outColor = vec4( lightIntensity * vec3(texture(texDiffuse, fragTexCoord)), 1 );
     vec4 albedo = texture( texDiffuse, fragTexCoord );
 
-	if ( mat.aAlphaTest && albedo.a == 0.f )
-	{
-		outColor     = albedo;
-		gl_FragDepth = gl_FragCoord.z / outColor.a;
-		return;
-	}
-	else
-	{
-		gl_FragDepth = gl_FragCoord.z;
-	}
+	// TODO: Alpha Reference
+	if ( mat.aAlphaTest && albedo.a < 0.5f )
+		discard;
 
 	// outColor = albedo;
 	// return;
@@ -205,8 +184,8 @@ void main()
 			// mat4 depthBiasMVP = gBiasMat * gViewInfo[ 0 ].aProjView;
 			vec4 shadowCoord = depthBiasMVP * vec4( inPositionWorld, 1.0 );
 
-			// float shadow = textureProj( gLightsWorld[ i ].aShadow, vec4(shadowCoord / shadowCoord.w) );
-			float shadow = textureProj( 0, vec4(shadowCoord / shadowCoord.w) );
+			// float shadow = SampleShadowMapPCF( gLightsWorld[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
+			float shadow = SampleShadowMapPCF( 0, shadowCoord.xyz / shadowCoord.w );
 			diff *= shadow;
 			// diff = shadow;
 		}
@@ -279,7 +258,7 @@ void main()
 
 			// TODO: this could go out of bounds and lose the device
 			// maybe add a check here to make sure we don't go out of bounds?
-			float shadow = textureProj( gLightsCone[ i ].aShadow, vec4(shadowCoord / shadowCoord.w) );
+			float shadow = SampleShadowMapPCF( gLightsCone[ i ].aShadow, shadowCoord.xyz / shadowCoord.w );
 			diff *= shadow;
 		}
 
